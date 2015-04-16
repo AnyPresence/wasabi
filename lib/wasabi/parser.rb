@@ -121,16 +121,48 @@ module Wasabi
         name = element.attribute('name').to_s.snakecase.to_sym
 
         if operation = @operations[name]
-          element.xpath("*[local-name() ='complexType']/*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
-            attr_name = child_element.attribute('name').to_s
-            attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
+          if element.xpath("*[local-name() ='complexType']").length > 0
+            element.xpath("*[local-name() ='complexType']/*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
+              attr_name = child_element.attribute('name').to_s
+              attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
 
-            operation[:parameters] ||= {}
-            operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type }
+              operation[:parameters] ||= {}
+              operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type }
+            end
+          # Didn't find any nested complexTypes under the element -- let's see if we can find one elsewhere in the schema
+          else
+
+            type = element.attribute('type').to_s
+            if type
+              type_tokens = type.split ":"
+              ns_prefix = type_tokens.length == 1 ? nil : type_tokens[0]
+              local_type_name = type_tokens.last
+              
+              namespace_key = ns_prefix.nil? ? "xmlns" : "xmlns:#{ns_prefix}"
+              ns_value = element.namespaces[namespace_key]
+              
+              document.xpath("wsdl:definitions/wsdl:types/*[local-name()='schema']/*[local-name()='complexType' and @name='#{local_type_name}']", { 'wsdl' => WSDL }).each do |element|
+                tns = target_namespace(element)
+                if tns == ns_value
+                  element.xpath("*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
+                  
+                    attr_name = child_element.attribute('name').to_s
+                    attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
+
+                    operation[:parameters] ||= {}
+                    operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type }
+                  end
+                  break
+                end
+              end
+            end
+
           end
         end
       end
     end
+    
+
 
     def parse_operations
       operations = document.xpath('wsdl:definitions/wsdl:binding/wsdl:operation', 'wsdl' => WSDL)
@@ -314,6 +346,19 @@ module Wasabi
       end
 
       @sections = sections
+    end
+    
+    private
+    
+    def target_namespace(element)
+      return nil if element.nil?
+      
+      tns = element.attribute('targetNamespace')
+      if tns.nil?
+        return target_namespace(element.parent)
+      else
+        return tns.to_s
+      end
     end
   end
 end
