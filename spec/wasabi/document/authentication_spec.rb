@@ -28,7 +28,7 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should == {
-        :authenticate => { :input => "authenticate", :output => "authenticateResponse", :action => "authenticate", :namespace_identifier => "tns" }
+        :authenticate => { :input => "authenticate", :output => "authenticateResponse", :action => "authenticate", :namespace_identifier => "tns", :parameters => { :user => { :name=>"user", :type=>"string" }, :password => { :name=>"password", :type=>"string" } } }
       }
     end
     end
