@@ -116,6 +116,12 @@
   <s0:message name="helloResponse">
     <s0:part element="s1:helloResponse" name="helloResultPart"/>
   </s0:message>
+  <s0:message name="GetQuickApproverList">
+    <s0:part element="s1:GetQuickApproverList" name="parameters"/>
+  </s0:message>
+  <s0:message name="GetQuickApproverListResponse">
+    <s0:part element="s1:GetQuickApproverListResponse" name="GetQuickApproverListResultPart"/>
+  </s0:message>
   <s0:portType name="querySoap">
     <s0:operation name="GetQuickApproverList" parameterOrder="parameters">
       <s0:input message="s1:GetQuickApproverList"/>

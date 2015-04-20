@@ -14,7 +14,7 @@ describe Wasabi::Parser do
     it 'does not blow up when an extension base element is defined in an import' do
       request = subject.operations[:get_system_info_request]
 
-      expect(request[:input]).to eq('GetSystemInfoRequest')
+      expect(request[:input]).to eq({:name=>"GetSystemInfoRequest", :namespace_identifier=>"impl", :namespace=>"http://juniper.net/webproxy/systemservice"})
       expect(request[:action]).to eq('urn:#GetSystemInfoRequest')
       expect(request[:namespace_identifier]).to eq('impl')
     end

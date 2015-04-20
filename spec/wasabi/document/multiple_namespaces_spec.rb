@@ -27,7 +27,7 @@ describe Wasabi::Document do
     describe '#operations' do
       subject { super().operations }
       it do
-      should == { :save => { :input => "Save", :output=>"SaveResponse", :action => "http://example.com/actions.Save", :namespace_identifier => "actions", :parameters => { :article => { :name => "article", :type => "Article" } } } }
+      should == { :save => { :action => "http://example.com/actions.Save", :input=>{:name=>"Save", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"}, :output=>{:name=>"SaveResponse", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"}, :namespace_identifier => "actions", :parameters => { :article => { :name => "article", :type => "Article", :namespace_identifier=>"article", :namespace=>"http://example.com/article" } } } }
     end
     end
 

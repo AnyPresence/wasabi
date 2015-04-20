@@ -120,14 +120,15 @@ module Wasabi
       root_elements = document.xpath("wsdl:definitions/wsdl:types/*[local-name()='schema']/*[local-name()='element']", 'wsdl' => WSDL).each do |element|
         name = element.attribute('name').to_s.snakecase.to_sym
 
-        if operation = @operations[name]
+        if operation = operation_for_element(element.attribute('name').to_s, target_namespace(element))
           if element.xpath("*[local-name() ='complexType']").length > 0
             element.xpath("*[local-name() ='complexType']/*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
               attr_name = child_element.attribute('name').to_s
+              attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil              
               attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
 
               operation[:parameters] ||= {}
-              operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type }
+              operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
             end
           # Didn't find any nested complexTypes under the element -- let's see if we can find one elsewhere in the schema
           else
@@ -147,10 +148,11 @@ module Wasabi
                   element.xpath("*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
                   
                     attr_name = child_element.attribute('name').to_s
+                    attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil
                     attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
 
                     operation[:parameters] ||= {}
-                    operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type }
+                    operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
                   end
                   break
                 end
@@ -178,11 +180,11 @@ module Wasabi
           action = soap_action && !soap_action.empty? ? soap_action : name
 
           # There should be a matching portType for each binding, so we will lookup the input from there.
-          namespace_id, output = output_for(operation)
-          namespace_id, input = input_for(operation)
+          output_namespace_id, output = output_for(operation)
+          input_namespace_id, input = input_for(operation)
 
           # Store namespace identifier so this operation can be mapped to the proper namespace.
-          @operations[name.snakecase.to_sym] = { :action => action, :input => input, :output => output, :namespace_identifier => namespace_id}
+          @operations[name.snakecase.to_sym] = { :action => action, :input => {:name => input, :namespace_identifier => input_namespace_id, :namespace => resolve_namespace(operation, input_namespace_id)}, :output => {:name => output, :namespace_identifier => output_namespace_id, :namespace => resolve_namespace(operation, output_namespace_id)}, :namespace_identifier => input_namespace_id}
         elsif !@operations[name.snakecase.to_sym]
           @operations[name.snakecase.to_sym] = { :action => name, :input => name }
         end
@@ -347,7 +349,7 @@ module Wasabi
 
       @sections = sections
     end
-    
+        
     private
     
     def target_namespace(element)
@@ -359,6 +361,41 @@ module Wasabi
       else
         return tns.to_s
       end
+    end
+    
+    def resolve_namespace(element, prefix)
+      ns_key = prefix.nil? ? "xmlns" : "xmlns:#{prefix}"
+      element.namespaces[ns_key]
+    end
+    
+    def operation_for_element(element_name, element_namespace)
+      document.xpath("wsdl:definitions/wsdl:message/wsdl:part[contains(@element,'#{element_name}')]", "wsdl" => WSDL).each do |element|
+        element.namespaces.each do |k,v|
+          ns = k.split(":")[1]
+          fully_qualified_element_name = ns.nil? ? element_name : "#{ns}:#{element_name}"
+          if v == element_namespace && element.attribute('element').to_s == fully_qualified_element_name
+            message_element = element.parent
+            message_name = message_element.attribute('name').to_s
+            
+            message_namespace = target_namespace(message_element)
+            document.xpath("wsdl:definitions/wsdl:portType/wsdl:operation/wsdl:input[contains(@message, '#{message_name}')]", "wsdl" => WSDL).each do |element|
+              element.namespaces.each do |k,v|
+                ns = k.split(":")[1]
+                fully_qualified_element_name = ns.nil? ? element_name : "#{ns}:#{message_name}"
+                if v == message_namespace && element.attribute('message').to_s == fully_qualified_element_name
+                  operation_element = element.parent
+                  operation_name = operation_element.attribute('name').to_s
+                  
+                  return @operations[operation_name.snakecase.to_sym]
+                end
+              end
+            end
+            
+          end
+        end
+      end
+      
+      nil
     end
   end
 end

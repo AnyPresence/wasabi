@@ -13,10 +13,10 @@ describe Wasabi::Parser do
 
     it 'falls back to using the message type in the port element' do
       # Operation's input has no part element in the message, so using the message type.
-      expect(subject.operations[:save][:input]).to eq('Save')
+      expect(subject.operations[:save][:input]).to eq({:name=>"Save", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"})
 
       # Operation's output has part element in the message, so using part element's type.
-      expect(subject.operations[:save][:output]).to eq('SaveResponse')
+      expect(subject.operations[:save][:output]).to eq({:name=>"SaveResponse", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"})
     end
 
     it 'falls back to using the namespace ID in the port element' do
@@ -24,8 +24,8 @@ describe Wasabi::Parser do
     end
 
     it 'gracefully handles port messages without a colon' do
-      expect(subject.operations[:delete][:input]).to eq('Delete')
-      expect(subject.operations[:delete][:output]).to eq('DeleteResponse')
+      expect(subject.operations[:delete][:input]).to eq({:name=>"Delete", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"})
+      expect(subject.operations[:delete][:output]).to eq({:name=>"DeleteResponse", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"})
       expect(subject.operations[:delete][:namespace_identifier]).to be_nil
     end
   end

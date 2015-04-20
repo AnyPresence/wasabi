@@ -28,9 +28,9 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should include(
-        { :delete_client => { :input => "Client.Delete", :output => "Client.DeleteResponse", :action => "http://api.example.com/api/Client.Delete", :namespace_identifier => "tns" } },
-        { :get_clients   => { :input => "User.GetClients", :output => "User.GetClientsResponse", :action => "http://api.example.com/api/User.GetClients", :namespace_identifier => "tns" } },
-        { :get_api_key   => { :input => "User.GetApiKey", :output => "User.GetApiKeyResponse", :action => "http://api.example.com/api/User.GetApiKey", :namespace_identifier => "tns" } }
+        { :delete_client => { :input => {:name=>"Client.Delete", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :output=>{:name=>"Client.DeleteResponse", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :action => "http://api.example.com/api/Client.Delete", :namespace_identifier => "tns", :parameters=>{:ApiKey=>{:name=>"ApiKey", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}, :ClientID=>{:name=>"ClientID", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}} } },
+        { :get_clients   => { :input => {:name=>"User.GetClients", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :output=>{:name=>"User.GetClientsResponse", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :action => "http://api.example.com/api/User.GetClients", :namespace_identifier => "tns", :parameters=>{:ApiKey=>{:name=>"ApiKey", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}} } },
+        { :get_api_key   => { :input => {:name=>"User.GetApiKey", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :output => {:name=>"User.GetApiKeyResponse", :namespace_identifier=>"tns", :namespace=>"http://api.example.com/api/"}, :action => "http://api.example.com/api/User.GetApiKey", :namespace_identifier => "tns", :parameters=>{:SiteUrl=>{:name=>"SiteUrl", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}, :Username=>{:name=>"Username", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}, :Password=>{:name=>"Password", :type=>"string", :namespace_identifier=>"s", :namespace=>"http://www.w3.org/2001/XMLSchema"}} } }
       )
     end
     end

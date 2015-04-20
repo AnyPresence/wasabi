@@ -15,7 +15,7 @@ describe Wasabi::Parser do
       it 'uses the part specified in parts attribute' do
         request = subject.operations[:some_operation][:input]
 
-        expect(request).to eq("SomeRequestBody")
+        expect(request).to eq({:name=>"SomeRequestBody", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"})
       end
     end
     
@@ -23,7 +23,7 @@ describe Wasabi::Parser do
       it 'uses the first part element in message' do
         request = subject.operations[:other_operation][:input]
 
-        expect(request).to eq("SomeRequest")
+        expect(request).to eq({:name=>"SomeRequest", :namespace_identifier=>"actions", :namespace=>"http://example.com/actions"})
       end
     end
     

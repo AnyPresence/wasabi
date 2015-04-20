@@ -28,8 +28,8 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should include(
-        { :get_quick_approver_list => { :input => "GetQuickApproverList", :action => "GetQuickApproverList", :parameters=>{:Request=>{:name=>"Request", :type=>"GetQuickApproverListInput"}}}},
-        { :hello => { :input => "hello", :action => "hello", :parameters=>{:Input=>{:name=>"Input", :type=>"string"}} } }
+        { :get_quick_approver_list => { :input => "GetQuickApproverList", :action => "GetQuickApproverList", :parameters=>{:Request=>{:name=>"Request", :type=>"GetQuickApproverListInput", :namespace_identifier=>"quer", :namespace=>"http://api.geotrust.com/webtrust/query"}}}},
+        { :hello => { :input => "hello", :action => "hello", :parameters=>{:Input=>{:name=>"Input", :type=>"string", :namespace_identifier=>"xs", :namespace=>"http://www.w3.org/2001/XMLSchema"}} } }
       )
     end
     end
