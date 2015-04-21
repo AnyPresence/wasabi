@@ -28,7 +28,7 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should == {
-        :authenticate => { :action => "authenticate", :input => {:name => "authenticate", :namespace_identifier=>"tns", :namespace=>"http://v1_0.ws.auth.order.example.com/" }, :output => {:name => "authenticateResponse", :namespace_identifier=>"tns", :namespace=>"http://v1_0.ws.auth.order.example.com/"}, :namespace_identifier=>"tns", :parameters => { :user => { :name=>"user", :type=>"string", :namespace_identifier => "xs", :namespace => "http://www.w3.org/2001/XMLSchema" }, :password => { :name=>"password", :type=>"string", :namespace_identifier => "xs", :namespace => "http://www.w3.org/2001/XMLSchema" } } }
+        :authenticate => { :action => "authenticate", :input => {:name => "authenticate", :namespace_identifier=>"tns", :namespace=>"http://v1_0.ws.auth.order.example.com/" }, :output => {:name => "authenticateResponse", :namespace_identifier=>"tns", :namespace=>"http://v1_0.ws.auth.order.example.com/"}, :namespace_identifier=>"tns", :namespace=>"http://v1_0.ws.auth.order.example.com/", :parameters => { :user => { :name=>"user", :type=>"string", :namespace_identifier => "xs", :namespace => "http://www.w3.org/2001/XMLSchema" }, :password => { :name=>"password", :type=>"string", :namespace_identifier => "xs", :namespace => "http://www.w3.org/2001/XMLSchema" } } }
       }
     end
     end

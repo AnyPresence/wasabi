@@ -184,7 +184,7 @@ module Wasabi
           input_namespace_id, input = input_for(operation)
 
           # Store namespace identifier so this operation can be mapped to the proper namespace.
-          @operations[name.snakecase.to_sym] = { :action => action, :input => {:name => input, :namespace_identifier => input_namespace_id, :namespace => resolve_namespace(operation, input_namespace_id)}, :output => {:name => output, :namespace_identifier => output_namespace_id, :namespace => resolve_namespace(operation, output_namespace_id)}, :namespace_identifier => input_namespace_id}
+          @operations[name.snakecase.to_sym] = { :action => action, :input => {:name => input, :namespace_identifier => input_namespace_id, :namespace => resolve_namespace(operation, input_namespace_id)}, :output => {:name => output, :namespace_identifier => output_namespace_id, :namespace => resolve_namespace(operation, output_namespace_id)}, :namespace_identifier => input_namespace_id, :namespace => resolve_namespace(operation, input_namespace_id)}
         elsif !@operations[name.snakecase.to_sym]
           @operations[name.snakecase.to_sym] = { :action => name, :input => name }
         end
