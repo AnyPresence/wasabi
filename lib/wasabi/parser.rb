@@ -21,6 +21,7 @@ module Wasabi
       self.types = {}
       self.deferred_types = []
       self.element_form_default = :unqualified
+      self.top_level_elements = {}
     end
 
     # Returns the Nokogiri document.
@@ -49,6 +50,9 @@ module Wasabi
 
     # Returns the elementFormDefault value.
     attr_accessor :element_form_default
+    
+    # Returns the top-level elements defined in the XML schemas
+    attr_accessor :top_level_elements
 
     def parse
       parse_namespaces
@@ -197,11 +201,24 @@ module Wasabi
 
         schema.element_children.each do |node|
           namespace = schema_namespace || @namespace
+          @top_level_elements[namespace] ||= {}
 
           case node.name
           when 'element'
             complex_type = node.at_xpath('./xs:complexType', 'xs' => XSD)
-            process_type namespace, complex_type, node['name'].to_s if complex_type
+            if complex_type
+              process_type namespace, complex_type, node['name'].to_s
+              @top_level_elements[namespace][node['name'].to_s] = { :type_name => node['name'].to_s, :type_namespace => namespace, :type_namespace_identifier => nil }
+            else
+              if node.attribute('type')
+                type_ref = node.attribute('type').to_s
+                type_segments = type_ref.split ":"
+                type_ns_prefix = type_segments.length > 1 ? type_segments[0] : nil
+                type_ns = resolve_namespace node, type_ns_prefix
+                type_name = type_segments.last
+                @top_level_elements[namespace][node['name'].to_s] = { :type_name => type_name, :type_namespace => type_ns, :type_namespace_identifier => type_ns_prefix }
+              end
+            end
           when 'complexType'
             process_type namespace, node, node['name'].to_s
           end
