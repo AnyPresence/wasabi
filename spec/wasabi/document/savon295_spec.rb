@@ -9,7 +9,7 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should include(
-        { :sendsms => { :input=>{:name=>"sendsms", :namespace_identifier=>"tns", :namespace=>"http://bedrift.telefonkatalogen.no"}, :output=>{:name=>"sendsms", :namespace_identifier=>"tns", :namespace=>"http://bedrift.telefonkatalogen.no"}, :action => "sendsms", :namespace_identifier => "tns", :namespace=>"http://bedrift.telefonkatalogen.no" } }
+        { :sendsms => { :input=>{:name=>"sendsms", :namespace_identifier=>"tns", :namespace=>"http://bedrift.telefonkatalogen.no"}, :output=>{:name=>"sendsmsResponse", :namespace_identifier=>"tns", :namespace=>"http://bedrift.telefonkatalogen.no"}, :action => "sendsms", :namespace_identifier => "tns", :namespace=>"http://bedrift.telefonkatalogen.no" } }
       )
     end
     end

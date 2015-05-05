@@ -28,9 +28,9 @@ describe Wasabi::Document do
       subject { super().operations }
       it do
       should include(
-        { :get_user_login_by_id => { :input=>{:name=>"GetUserLoginById", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :output=>{:name=>"GetUserLoginById", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :action => "/api/api/GetUserLoginById", :namespace_identifier => "typens", :namespace => "urn:ActionWebService" } },
-        { :get_all_contacts => { :input=>{:name=>"GetAllContacts", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :output=>{:name=>"GetAllContacts", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :action => "/api/api/GetAllContacts", :namespace_identifier => "typens", :namespace => "urn:ActionWebService" } },
-        { :search_user => { :input=>{:name=>"SearchUser", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"}, :output=>{:name=>"SearchUser", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"}, :action => "/api/api/SearchUser", :namespace_identifier => nil, :namespace => "http://schemas.xmlsoap.org/wsdl/" } }
+        { :get_user_login_by_id => { :input=>{:name=>"GetUserLoginById", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :output=>{:name=>"GetUserLoginByIdResponse", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :action => "/api/api/GetUserLoginById", :namespace_identifier => "typens", :namespace => "urn:ActionWebService" } },
+        { :get_all_contacts => { :input=>{:name=>"GetAllContacts", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :output=>{:name=>"GetAllContactsResponse", :namespace_identifier=>"typens", :namespace=>"urn:ActionWebService"}, :action => "/api/api/GetAllContacts", :namespace_identifier => "typens", :namespace => "urn:ActionWebService" } },
+        { :search_user => { :input=>{:name=>"SearchUser", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"}, :output=>{:name=>"SearchUserResponse", :namespace_identifier=>nil, :namespace=>"http://schemas.xmlsoap.org/wsdl/"}, :action => "/api/api/SearchUser", :namespace_identifier => nil, :namespace => "http://schemas.xmlsoap.org/wsdl/" } }
       )
     end
     end

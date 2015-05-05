@@ -429,6 +429,9 @@ module Wasabi
         # Fall back to the name of the binding operation
         if message_type
           [message_ns_id, message_type]
+        elsif !message_type && input_output == 'output'
+          # if its the output, use the output's name instead of the operation
+          [port_message_ns_id, port_message_type]
         else
           [port_message_ns_id, operation_name]
         end
