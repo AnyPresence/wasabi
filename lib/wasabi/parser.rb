@@ -12,6 +12,8 @@ module Wasabi
     WSDL     = 'http://schemas.xmlsoap.org/wsdl/'
     SOAP_1_1 = 'http://schemas.xmlsoap.org/wsdl/soap/'
     SOAP_1_2 = 'http://schemas.xmlsoap.org/wsdl/soap12/'
+    
+    STYLES = [:rpc_literal, :rpc_encoded, :document_literal]
 
     def initialize(document)
       self.document = document
@@ -22,6 +24,8 @@ module Wasabi
       self.deferred_types = []
       self.element_form_default = :unqualified
       self.top_level_elements = {}
+      self.style = nil
+      self.pseudo_types = {}
     end
 
     # Returns the Nokogiri document.
@@ -53,7 +57,13 @@ module Wasabi
     
     # Returns the top-level elements defined in the XML schemas
     attr_accessor :top_level_elements
-
+    
+    # Returns the style (either document or RPC)
+    attr_accessor :style
+    
+    # Returns any pseudo types that were created for RPC calls
+    attr_accessor :pseudo_types
+    
     def parse
       parse_namespaces
       parse_endpoint
@@ -61,10 +71,18 @@ module Wasabi
       parse_messages
       parse_port_types
       parse_port_type_operations
+      parse_style
       parse_operations
       parse_operations_parameters
       parse_types
       parse_deferred_types
+      parse_rpc_top_level_elements
+    end
+
+    def parse_style
+      binding = document.xpath('wsdl:definitions/wsdl:binding/soap:binding', {'wsdl' => WSDL, 'soap' => SOAP_1_1}).first
+      binding ||= document.xpath('wsdl:definitions/wsdl:binding/soap:binding', {'wsdl' => WSDL, 'soap' => SOAP_1_2}).first
+      @style = binding['style'] if binding
     end
 
     def parse_namespaces
@@ -167,8 +185,6 @@ module Wasabi
         end
       end
     end
-    
-
 
     def parse_operations
       operations = document.xpath('wsdl:definitions/wsdl:binding/wsdl:operation', 'wsdl' => WSDL)
@@ -207,7 +223,7 @@ module Wasabi
           when 'element'
             complex_type = node.at_xpath('./xs:complexType', 'xs' => XSD)
             if complex_type
-              process_type namespace, complex_type, node['name'].to_s
+              process_complex_type namespace, complex_type, node['name'].to_s
               @top_level_elements[namespace][node['name'].to_s] = { :type_name => node['name'].to_s, :type_namespace => namespace, :type_namespace_identifier => nil }
             else
               if node.attribute('type')
@@ -220,13 +236,88 @@ module Wasabi
               end
             end
           when 'complexType'
-            process_type namespace, node, node['name'].to_s
+            process_complex_type namespace, node, node['name'].to_s
+          when 'simpleType'
+            process_simple_type namespace, node, node['name'].to_s
           end
         end
       end
     end
+    
+    def parse_rpc_top_level_elements
+      return unless @style == 'rpc'
+      
+      # Iterate over the operations and process each
+      document.xpath('wsdl:definitions/wsdl:portType/wsdl:operation', 'wsdl' => WSDL).each do |operation|
+        # In RPC style, the operation name is treated as a top level element
+        operation_name = operation['name']
+        input_message_name = nil
+        input_elt = nil
+        output_message_name = nil
+        output_elt = nil
+        operation.xpath('./wsdl:input', 'wsdl' => WSDL).each do |input|
+          input_message_name = input['message']
+          input_elt = input
+        end
+        operation.xpath('./wsdl:output', 'wsdl' => WSDL).each do |output|
+          output_message_name = output['message']
+          output_elt = output
+        end
+        
+        input_qname = expand_name(input_message_name, input_elt)
+        output_qname = expand_name(output_message_name, output_elt)
+        
+        input_element_name = operation_name
+        output_element_name = output_message_name
+        
+        @top_level_elements[input_qname[:namespace]] ||= {}
+        input_type_hash = @top_level_elements[input_qname[:namespace]]
+        input_type_hash[input_qname[:name]] = {}
+        input_type = input_type_hash[input_qname[:name]]
+        # since this is a manufactured type, we don't want to conflict with user defined types,
+        # so we'll prefix the type name with an ampersand, which would be illegal in XML, so there's no
+        # chance of conflicting with an actual valid type
+        input_type[:type_name] = "&" + input_element_name + "Type" 
+        input_type[:type_namespace] = input_qname[:namespace]
+        input_type[:type_namespace_identifier] = input_qname[:namespace_prefix]
+        
+        create_rpc_pseudo_type(input_type, input_elt)
+        
+        @top_level_elements[output_qname[:namespace]] ||= {}
+        output_type_hash = @top_level_elements[output_qname[:namespace]]
+        output_type_hash[output_qname[:name]] = {}
+        output_type = output_type_hash[output_qname[:name]]
+        # same here as above -- create manufactured type name
+        output_type[:type_name] = "&" + output_qname[:name] + "Type"
+        output_type[:type_namespace] = output_qname[:namespace]
+        output_type[:type_namespace_identifier] = output_qname[:namespace_prefix]
+        
+        create_rpc_pseudo_type(output_type, output_elt)
+      end
+    end
+    
+    def process_simple_type(namespace, type, name)
+      @types[namespace] ||= {}
+      @types[namespace][name] ||= { :namespace => namespace }
 
-    def process_type(namespace, type, name)
+      type.xpath('./xs:restriction', 'xs' => XSD).each do |restriction|
+        element_name = restriction.attribute('base').to_s
+        local_type_name, ns_pfx = element_name.split(':').reverse
+        ns = resolve_namespace(restriction, ns_pfx)
+        @types[namespace][name][:base_type] = { :type => element_name, :type_name => local_type_name, :type_namespace => ns }
+        restriction.xpath('./xs:enumeration', 'xs' => XSD).each do |enumeration|
+          value = enumeration.attribute('value').to_s
+          @types[namespace][name][:base_type][:enumeration] ||= []
+          @types[namespace][name][:base_type][:enumeration] << value
+        end
+        restriction.xpath('./xs:pattern', 'xs' => XSD).each do |pattern|
+          value = pattern.attribute('value').to_s
+          @types[namespace][name][:base_type][:pattern] = value
+        end
+      end
+    end
+
+    def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
       @types[namespace][name][:order!] = []
@@ -370,7 +461,23 @@ module Wasabi
 
       @sections = sections
     end
-        
+    
+    # returns all types merged with pseudo types
+    def all_types
+      all = {}
+      @types.each { |k,v| all[k] = v }
+      
+      @pseudo_types.each do |k,v|
+        existing_types = all[k]
+        if existing_types.nil? 
+          all[k] = v
+        else
+          all[k] = existing_types.merge(v)
+        end
+      end
+      all
+    end
+    
     private
     
     def target_namespace(element)
@@ -417,6 +524,58 @@ module Wasabi
       end
       
       nil
+    end
+    
+    def expand_name(name, elt)
+      qname = {}
+      
+      segments = name.split(":")
+      
+      if segments.length == 1
+        qname[:namespace_prefix] = nil
+        qname[:name] = segments[0]
+      else
+        qname[:namespace_prefix] = segments.first
+        qname[:name] = segments.last
+      end
+      
+      qname[:namespace] = resolve_namespace(elt, qname[:namespace_prefix])
+      qname
+    end
+    
+    def create_rpc_pseudo_type(type, elt)
+      message = elt['message']
+      message_qname = expand_name(message, elt)
+      
+      message_declarations = document.xpath('wsdl:definitions/wsdl:message', 'wsdl' => WSDL).select do |message| 
+        segments = message['name'].split(':').reverse
+        message_localname = segments[0]
+        message_qname[:name] == message_localname
+      end
+      
+      message_declaration = message_declarations.last
+      
+      @pseudo_types[type[:type_namespace]] ||= {}
+      @pseudo_types[type[:type_namespace]][type[:type_name]] = {}
+      
+      pseudo_type = @pseudo_types[type[:type_namespace]][type[:type_name]]
+      
+      message_declaration.xpath('./wsdl:part', 'wsdl' => WSDL).each do |part|
+        raise "Referencing an element not yet supported from a part declared in a message" if part['type'].nil? && !part['element'].nil?
+        
+        part_name = part['name']
+        part_type = part['type']
+        
+        part_qname = expand_name(part_type, part)
+        
+        pseudo_type[:namespace] = type[:type_namespace]
+        pseudo_type[:"order!"] ||= []
+        pseudo_type[:"order!"] << part_name
+        pseudo_type[part_name] ||= {}
+        pseudo_type[part_name][:type] = part_type
+        pseudo_type[part_name][:type_name] = part_qname[:name]
+        pseudo_type[part_name][:type_namespace] = part_qname[:namespace]
+      end
     end
   end
 end
