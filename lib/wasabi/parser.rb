@@ -281,7 +281,7 @@ module Wasabi
         input_type[:type_namespace] = input_qname[:namespace]
         input_type[:type_namespace_identifier] = input_qname[:namespace_prefix]
         
-        create_rpc_pseudo_type(input_type, input_elt)
+        create_rpc_pseudo_type(input_type, input_elt, operation_name.snakecase.to_sym, true)
         
         @top_level_elements[output_qname[:namespace]] ||= {}
         output_type_hash = @top_level_elements[output_qname[:namespace]]
@@ -292,7 +292,7 @@ module Wasabi
         output_type[:type_namespace] = output_qname[:namespace]
         output_type[:type_namespace_identifier] = output_qname[:namespace_prefix]
         
-        create_rpc_pseudo_type(output_type, output_elt)
+        create_rpc_pseudo_type(output_type, output_elt, operation_name.snakecase.to_sym, false)
       end
     end
     
@@ -546,7 +546,9 @@ module Wasabi
       qname
     end
     
-    def create_rpc_pseudo_type(type, elt)
+    def create_rpc_pseudo_type(type, elt, operation_identifier, input)
+      operation = @operations[operation_identifier]
+      
       message = elt['message']
       message_qname = expand_name(message, elt)
       
@@ -578,6 +580,15 @@ module Wasabi
         pseudo_type[part_name][:type] = part_type
         pseudo_type[part_name][:type_name] = part_qname[:name]
         pseudo_type[part_name][:type_namespace] = part_qname[:namespace]
+        
+        if input
+          operation[:parameters] ||= {}
+          operation[:parameters][part_name.to_sym] ||= {}
+          operation[:parameters][part_name.to_sym][:name] = part_name
+          operation[:parameters][part_name.to_sym][:type] = part_qname[:name]
+          operation[:parameters][part_name.to_sym][:namespace_identifier] = part_qname[:namespace_prefix]
+          operation[:parameters][part_name.to_sym][:namespace] = part_qname[:namespace]
+        end
       end
     end
   end
