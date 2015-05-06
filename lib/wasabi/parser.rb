@@ -320,7 +320,6 @@ module Wasabi
     def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
-      @types[namespace][name][:order!] = []
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
         element_name = inner.attribute('name').to_s
@@ -334,6 +333,7 @@ module Wasabi
           end
         end
 
+        @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
       end
       
@@ -353,29 +353,13 @@ module Wasabi
         @types[namespace][name][:unordered] << element_name
       end
       
-      
-=begin      
-      type.xpath('./xs:any/xs:element', 'xs' => XSD).each do |inner|
-        element_name = inner.attribute('name').to_s
-        local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
-        ns = resolve_namespace(inner, ns_pfx)
-        @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
-
-        [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
-          if v = inner.attribute(attr.to_s)
-            @types[namespace][name][element_name][attr] = v.to_s
-          end
-        end
-
-        @types[namespace][name][:order!] << element_name
-      end
-=end
       type.xpath('./xs:complexContent/xs:extension/xs:sequence/xs:element', 'xs' => XSD).each do |inner_element|
         element_name = inner_element.attribute('name').to_s
         local_type_name, ns_pfx = inner_element.attribute('type').to_s.split(':').reverse
         ns = resolve_namespace(inner_element, ns_pfx)
         @types[namespace][name][element_name] = { :type => inner_element.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
 
+        @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
       end
 

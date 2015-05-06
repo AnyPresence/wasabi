@@ -17,11 +17,11 @@ describe Wasabi::Parser do
     
     it "processes xsd:all" do
       keys =  subject.types['urn:ActionWebService']["MpUser"].keys
-      expect(keys.size).to eq(11)
+      expect(keys.size).to eq(10)
 
       expect(keys).to include(:namespace)
       expect(keys).to include(:unordered)
-      expect(keys).to include(:order!)
+      expect(keys).to !include(:order!)
       expect(subject.types['urn:ActionWebService']["MpUser"][:order!]).to eq([])
     end
 
