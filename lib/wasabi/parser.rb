@@ -336,7 +336,40 @@ module Wasabi
 
         @types[namespace][name][:order!] << element_name
       end
+      
+      type.xpath('./xs:all/xs:element', 'xs' => XSD).each do |inner|
+        element_name = inner.attribute('name').to_s
+        local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
+        ns = resolve_namespace(inner, ns_pfx)
+        @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        defaults = { minOccurs: 0, maxOccurs: 1}
+        defaults.each do |attrib, default_value|
+          if v = inner.attribute(attrib.to_s)
+            @types[namespace][name][element_name][attrib] = v.to_s || defaul_value
+          end
+        end
+        
+        @types[namespace][name][:unordered] ||= []
+        @types[namespace][name][:unordered] << element_name
+      end
+      
+      
+=begin      
+      type.xpath('./xs:any/xs:element', 'xs' => XSD).each do |inner|
+        element_name = inner.attribute('name').to_s
+        local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
+        ns = resolve_namespace(inner, ns_pfx)
+        @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
 
+        [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
+          if v = inner.attribute(attr.to_s)
+            @types[namespace][name][element_name][attr] = v.to_s
+          end
+        end
+
+        @types[namespace][name][:order!] << element_name
+      end
+=end
       type.xpath('./xs:complexContent/xs:extension/xs:sequence/xs:element', 'xs' => XSD).each do |inner_element|
         element_name = inner_element.attribute('name').to_s
         local_type_name, ns_pfx = inner_element.attribute('type').to_s.split(':').reverse

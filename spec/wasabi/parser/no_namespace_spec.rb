@@ -14,13 +14,16 @@ describe Wasabi::Parser do
     it "lists the types" do
       expect(subject.types['urn:ActionWebService'].keys.sort).to eq(["McContact", "McContactArray", "MpUser", "MpUserArray"])
     end
-
-    it "ignores xsd:all" do
+    
+    it "processes xsd:all" do
       keys =  subject.types['urn:ActionWebService']["MpUser"].keys
-      expect(keys.size).to eq(2)
+      expect(keys.size).to eq(11)
 
       expect(keys).to include(:namespace)
+      expect(keys).to include(:unordered)
       expect(keys).to include(:order!)
+      expect(subject.types['urn:ActionWebService']["MpUser"][:order!]).to eq([])
     end
+
   end
 end
