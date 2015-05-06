@@ -21,8 +21,7 @@ describe Wasabi::Parser do
 
       expect(keys).to include(:namespace)
       expect(keys).to include(:unordered)
-      expect(keys).to !include(:order!)
-      expect(subject.types['urn:ActionWebService']["MpUser"][:order!]).to eq([])
+      expect(subject.types['urn:ActionWebService']["MpUser"][:order!]).to be_nil
     end
 
   end
