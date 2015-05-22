@@ -350,41 +350,40 @@ module Wasabi
       
       @types.each do |namespace, values|
         values.each do |name, element|
+          next unless element[:refs]
           new_elements = {}
-          element.each do |k, v|
-            next unless element[:refs]
-            ref_names = element[:refs].map do |ref|
-              
-              referenced_element = resolve_element_ref(ref)
-              element_name = referenced_element[:name]
-              local_type_name = referenced_element[:type_name]
-              ns_pfx = referenced_element[:type_namespace_identifier]
-              ns = referenced_element[:type_namespace]
-              new_elements[element_name] = { :type => local_type_name, :type_name => local_type_name, :type_namespace => ns }
-              [synthetic_ref_id(ref), element_name]
-            end
-            
-            refs = ref_names.to_h
+          ref_names = element[:refs].map do |ref|
+            referenced_element = resolve_element_ref(ref)
+            element_name = referenced_element[:name]
+            local_type_name = referenced_element[:type_name]
+            ns_pfx = referenced_element[:type_namespace_identifier]
+            ns = referenced_element[:type_namespace]
+            new_elements[element_name] = { :type => local_type_name, :type_name => local_type_name, :type_namespace => ns }
+            [synthetic_ref_id(ref), element_name]
+          end
+          
+          refs = ref_names.to_h
 
-            new_order = []            
-            if element[:order!]
-              element[:order!].each do |ordered|
+          [:order!, :unordered].each do |sym|
+            new_order = []
+            if element[sym]
+              element[sym].each do |ordered|
                 if (refs.keys.include?(ordered))
                   new_order << refs[ordered]
                 else
                   new_order << ordered
                 end
               end
+              element[sym] = new_order
             end
-            element[:order!] = new_order
-            
-            element.delete :refs
           end
+
+          element.delete :refs
           
           new_elements.each do |element_name, value|
             @types[namespace][name][element_name] = value
           end
-          
+
         end
       end
     end
@@ -403,12 +402,23 @@ module Wasabi
         else
           element_name = inner.attribute('name').to_s
           local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
-          ns = resolve_namespace(inner, ns_pfx)
-          @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+          if local_type_name
+            ns = resolve_namespace(inner, ns_pfx)
+            @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
         
-          [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
-            if v = inner.attribute(attr.to_s)
-              @types[namespace][name][element_name][attr] = v.to_s
+            [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
+              if v = inner.attribute(attr.to_s)
+                @types[namespace][name][element_name][attr] = v.to_s
+              end
+            end
+          # we have to recursively handle nested complex types ...
+          elsif inner.xpath('./xs:complexType', 'xs' => XSD).length > 0
+            inner.xpath('./xs:complexType', 'xs' => XSD).each do |inner_complex_type|
+              generated_namespace = "urn:__generated__"
+              @types[generated_namespace] ||= {}
+              generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
+              @types[namespace][name][element_name] = { :type => generated_name, :type_name => generated_name, :type_namespace => generated_namespace }
+              process_complex_type(generated_namespace, inner_complex_type, generated_name)
             end
           end
         end
@@ -418,15 +428,22 @@ module Wasabi
       end
       
       type.xpath('./xs:all/xs:element', 'xs' => XSD).each do |inner|
-        element_name = inner.attribute('name').to_s
-        local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
-        ns = resolve_namespace(inner, ns_pfx)
-        @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
-        @types[namespace][name][element_name][:ref] = inner.attribute('ref').to_s if inner.attribute('ref')
-        defaults = { minOccurs: 0, maxOccurs: 1}
-        defaults.each do |attrib, default_value|
-          if v = inner.attribute(attrib.to_s)
-            @types[namespace][name][element_name][attrib] = v.to_s || defaul_value
+        element_name = nil
+        if inner.attribute('ref')
+          element_name = synthetic_ref_id inner
+          @types[namespace][name][:refs] ||= []
+          @types[namespace][name][:refs] << inner
+        else
+          element_name = inner.attribute('name').to_s
+          local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
+          ns = resolve_namespace(inner, ns_pfx)
+          @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+
+          defaults = { minOccurs: 0, maxOccurs: 1}
+          defaults.each do |attrib, default_value|
+            if v = inner.attribute(attrib.to_s)
+              @types[namespace][name][element_name][attrib] = v.to_s || defaul_value
+            end
           end
         end
         
@@ -435,11 +452,18 @@ module Wasabi
       end
       
       type.xpath('./xs:complexContent/xs:extension/xs:sequence/xs:element', 'xs' => XSD).each do |inner_element|
-        element_name = inner_element.attribute('name').to_s
-        local_type_name, ns_pfx = inner_element.attribute('type').to_s.split(':').reverse
-        ns = resolve_namespace(inner_element, ns_pfx)
-        @types[namespace][name][element_name] = { :type => inner_element.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
-        @types[namespace][name][element_name][:ref] = inner_element.attribute('ref').to_s if inner_element.attribute('ref')
+        element_name = nil
+        if inner_element.attribute('ref')
+          element_name = synthetic_ref_id inner_element
+          @types[namespace][name][:refs] ||= []
+          @types[namespace][name][:refs] << inner_element
+        else
+          element_name = inner_element.attribute('name').to_s
+          local_type_name, ns_pfx = inner_element.attribute('type').to_s.split(':').reverse
+          ns = resolve_namespace(inner_element, ns_pfx)
+          @types[namespace][name][element_name] = { :type => inner_element.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        end
+        
 
         @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
@@ -452,6 +476,8 @@ module Wasabi
           # Reverse merge because we don't want subclass attributes to be overriden by base class
           @types[namespace][name] = types[namespace][base].merge(types[namespace][name])
           @types[namespace][name][:order!] = @types[namespace][base][:order!] | @types[namespace][name][:order!]
+          @types[namespace][name][:refs] = @types[namespace][base][:refs] | @types[namespace][name][:refs]
+          @types[namespace][name].delete(:refs) if @types[namespace][name][:refs].nil?
           @types[namespace][name][:base_type] = base
         else
           p = Proc.new do
@@ -459,6 +485,8 @@ module Wasabi
               # Reverse merge because we don't want subclass attributes to be overriden by base class
               @types[namespace][name] = @types[namespace][base].merge(@types[namespace][name])
               @types[namespace][name][:order!] = @types[namespace][base][:order!] | @types[namespace][name][:order!]
+              @types[namespace][name][:refs] = @types[namespace][base][:refs] | @types[namespace][name][:refs]
+              @types[namespace][name].delete(:refs) if @types[namespace][name][:refs].nil?
               @types[namespace][name][:base_type] = base
             end
           end

@@ -167,7 +167,7 @@ module Wasabi
     end
 
     def element_keys(info)
-      info.keys - [:namespace, :order!, :base_type]
+      info.keys - [:namespace, :order!, :base_type, :unordered, :refs]
     end
   end
 end
