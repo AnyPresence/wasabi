@@ -306,7 +306,6 @@ module Wasabi
     end
     
     def process_simple_type(namespace, type, name)
-      puts "ITS BEING PROCESSED YO" if namespace == 'http://cardif.cl/Schema/ESO/Result/v1.0' && name == 'Status'
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
 
@@ -392,6 +391,31 @@ module Wasabi
     def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
+      
+      type.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
+        attribute_name = attribute.attribute('name').to_s
+        attribute_type = attribute.attribute('type')
+
+        @types[namespace][name][:attributes!] ||= {}
+        @types[namespace][name][:attributes!][attribute_name] = {}
+        if attribute_type
+          qname = expand_name(attribute_type.to_s, attribute)
+          
+          @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
+          @types[namespace][name][:attributes!][attribute_name][:type_name] = qname[:name]
+          @types[namespace][name][:attributes!][attribute_name][:type_namespace] = qname[:namespace]
+        elsif attribute.xpath('./xs:simpleType', 'xs' => XSD).length > 0
+          attribute.xpath('./xs:simpleType', 'xs' => XSD).each do |simple_type|
+            generated_namespace = "urn:__generated__"
+            @types[generated_namespace] ||= {}
+            generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
+            @types[namespace][name][:attributes!][attribute_name][:type] = generated_name
+            @types[namespace][name][:attributes!][attribute_name][:type_name]  = generated_name
+            @types[namespace][name][:attributes!][attribute_name][:type_namespace]  = generated_namespace
+            process_simple_type(generated_namespace, simple_type, generated_name)
+          end
+        end
+      end
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
         
