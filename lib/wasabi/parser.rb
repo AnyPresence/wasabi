@@ -306,6 +306,7 @@ module Wasabi
     end
     
     def process_simple_type(namespace, type, name)
+      puts "ITS BEING PROCESSED YO" if namespace == 'http://cardif.cl/Schema/ESO/Result/v1.0' && name == 'Status'
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
 
@@ -422,7 +423,7 @@ module Wasabi
             end
           # we also have to recursively handle nested simple types!
           elsif inner.xpath('./xs:simpleType', 'xs' => XSD).length > 0
-            inner.xpath('./xs:ximpleType', 'xs' => XSD).each do |inner_simple_type|
+            inner.xpath('./xs:simpleType', 'xs' => XSD).each do |inner_simple_type|
               generated_namespace = "urn:__generated__"
               @types[generated_namespace] ||= {}
               generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
