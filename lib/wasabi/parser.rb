@@ -77,6 +77,7 @@ module Wasabi
       parse_types
       parse_deferred_types
       parse_rpc_top_level_elements
+      resolve_element_refs
     end
 
     def parse_style
@@ -141,20 +142,23 @@ module Wasabi
     def parse_operations_parameters
       root_elements = document.xpath("wsdl:definitions/wsdl:types/*[local-name()='schema']/*[local-name()='element']", 'wsdl' => WSDL).each do |element|
         name = element.attribute('name').to_s.snakecase.to_sym
-
+        
         if operation = operation_for_element(element.attribute('name').to_s, target_namespace(element))
           if element.xpath("*[local-name() ='complexType']").length > 0
             element.xpath("*[local-name() ='complexType']/*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
-              attr_name = child_element.attribute('name').to_s
-              attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil              
-              attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
-
               operation[:parameters] ||= {}
-              operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
+              if child_element.attribute('type')
+                attr_name = child_element.attribute('name').to_s
+                attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil              
+                attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
+                
+                operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
+              elsif child_element.attribute('ref')
+                operation[:parameters][synthetic_ref_id(child_element)] = { :ref => child_element }
+              end
             end
           # Didn't find any nested complexTypes under the element -- let's see if we can find one elsewhere in the schema
           else
-
             type = element.attribute('type').to_s
             if type
               type_tokens = type.split ":"
@@ -168,13 +172,18 @@ module Wasabi
                 tns = target_namespace(element)
                 if tns == ns_value
                   element.xpath("*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
-                  
-                    attr_name = child_element.attribute('name').to_s
-                    attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil
-                    attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
-
                     operation[:parameters] ||= {}
-                    operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
+                    
+                    if child_element.attribute('type')
+                      attr_name = child_element.attribute('name').to_s
+                      attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil
+                      attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
+
+                    
+                      operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
+                    elsif child_element.attribute('ref')
+                      operation[:parameters][synthetic_ref_id(child_element)] = { :ref => child_element }
+                    end
                   end
                   break
                 end
@@ -223,16 +232,16 @@ module Wasabi
           when 'element'
             complex_type = node.at_xpath('./xs:complexType', 'xs' => XSD)
             if complex_type
-              process_complex_type namespace, complex_type, node['name'].to_s
               @top_level_elements[namespace][node['name'].to_s] = { :type_name => node['name'].to_s, :type_namespace => namespace, :type_namespace_identifier => nil }
+              process_complex_type namespace, complex_type, node['name'].to_s
             else
               if node.attribute('type')
                 type_ref = node.attribute('type').to_s
-                type_segments = type_ref.split ":"
-                type_ns_prefix = type_segments.length > 1 ? type_segments[0] : nil
-                type_ns = resolve_namespace node, type_ns_prefix
-                type_name = type_segments.last
-                @top_level_elements[namespace][node['name'].to_s] = { :type_name => type_name, :type_namespace => type_ns, :type_namespace_identifier => type_ns_prefix }
+                qname = expand_name(type_ref, node)
+                type_name = qname[:name]
+                type_ns = qname[:namespace]
+                type_ns_prefix = qname[:namespace_prefix]
+                @top_level_elements[namespace][node['name'].to_s] = { :type_name => qname[:name], :type_namespace => qname[:namespace], :type_namespace_identifier => qname[:namespace_prefix] }
               end
             end
           when 'complexType'
@@ -317,15 +326,86 @@ module Wasabi
       end
     end
 
+    def resolve_element_refs
+      @operations.each do |operation_name, operation|
+        new_params = {}
+        next unless operation[:parameters]
+        operation[:parameters].each do |ref_name, parameter|
+          if parameter[:ref]
+            elt = parameter[:ref]
+            referenced_element = resolve_element_ref(elt)
+            element_name = referenced_element[:name]
+            local_type_name = referenced_element[:type_name]
+            ns_pfx = referenced_element[:type_namespace_identifier]
+            ns = referenced_element[:type_namespace]
+            
+            new_params[ref_name] = { :name => element_name, :type => local_type_name, :namespace_identifier => ns_pfx, :namespace => ns }
+          end
+        end
+        new_params.each do |ref_name, new_param|
+          operation[:parameters].delete(ref_name)
+          operation[:parameters][new_param[:name]] = new_param
+        end
+      end
+      
+      @types.each do |namespace, values|
+        values.each do |name, element|
+          new_elements = {}
+          element.each do |k, v|
+            next unless element[:refs]
+            ref_names = element[:refs].map do |ref|
+              
+              referenced_element = resolve_element_ref(ref)
+              element_name = referenced_element[:name]
+              local_type_name = referenced_element[:type_name]
+              ns_pfx = referenced_element[:type_namespace_identifier]
+              ns = referenced_element[:type_namespace]
+              new_elements[element_name] = { :type => local_type_name, :type_name => local_type_name, :type_namespace => ns }
+              [synthetic_ref_id(ref), element_name]
+            end
+            
+            refs = ref_names.to_h
+
+            new_order = []            
+            if element[:order!]
+              element[:order!].each do |ordered|
+                if (refs.keys.include?(ordered))
+                  new_order << refs[ordered]
+                else
+                  new_order << ordered
+                end
+              end
+            end
+            element[:order!] = new_order
+            
+            element.delete :refs
+          end
+          
+          new_elements.each do |element_name, value|
+            @types[namespace][name][element_name] = value
+          end
+          
+        end
+      end
+    end
+
     def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
-        element_name = inner.attribute('name').to_s
-        local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
-        ns = resolve_namespace(inner, ns_pfx)
-        @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        
+        element_name = nil
+        if inner.attribute('ref')
+          element_name = synthetic_ref_id inner
+          @types[namespace][name][:refs] ||= []
+          @types[namespace][name][:refs] << inner
+        else
+          element_name = inner.attribute('name').to_s
+          local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
+          ns = resolve_namespace(inner, ns_pfx)
+          @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        end
 
         [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
           if v = inner.attribute(attr.to_s)
@@ -342,6 +422,7 @@ module Wasabi
         local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
         ns = resolve_namespace(inner, ns_pfx)
         @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        @types[namespace][name][element_name][:ref] = inner.attribute('ref').to_s if inner.attribute('ref')
         defaults = { minOccurs: 0, maxOccurs: 1}
         defaults.each do |attrib, default_value|
           if v = inner.attribute(attrib.to_s)
@@ -358,6 +439,7 @@ module Wasabi
         local_type_name, ns_pfx = inner_element.attribute('type').to_s.split(':').reverse
         ns = resolve_namespace(inner_element, ns_pfx)
         @types[namespace][name][element_name] = { :type => inner_element.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
+        @types[namespace][name][element_name][:ref] = inner_element.attribute('ref').to_s if inner_element.attribute('ref')
 
         @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
@@ -546,6 +628,17 @@ module Wasabi
       nil
     end
     
+    def resolve_element_ref(element)
+      ref_qname = expand_name(element.attribute('ref').to_s, element)
+      
+      namespace = ref_qname[:namespace]
+      name = ref_qname[:name]
+      
+      ref_element = @top_level_elements[namespace][name]
+      ref_element[:name] = name
+      ref_element
+    end
+    
     def expand_name(name, elt)
       qname = {}
       
@@ -561,6 +654,14 @@ module Wasabi
       
       qname[:namespace] = resolve_namespace(elt, qname[:namespace_prefix])
       qname
+    end
+    
+    def synthetic_ref_id(element)
+      "REF!" + element.attribute('ref').to_s
+    end
+    
+    def parse_synthetic_ref_id(synthetic_ref_id)
+      synthetic_ref_id.gsub /REF\!/, ''
     end
     
     def create_rpc_pseudo_type(type, elt, operation_identifier, input)
