@@ -405,11 +405,11 @@ module Wasabi
           local_type_name, ns_pfx =  inner.attribute('type').to_s.split(':').reverse
           ns = resolve_namespace(inner, ns_pfx)
           @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
-        end
-
-        [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
-          if v = inner.attribute(attr.to_s)
-            @types[namespace][name][element_name][attr] = v.to_s
+        
+          [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
+            if v = inner.attribute(attr.to_s)
+              @types[namespace][name][element_name][attr] = v.to_s
+            end
           end
         end
 
