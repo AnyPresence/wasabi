@@ -420,7 +420,17 @@ module Wasabi
               @types[namespace][name][element_name] = { :type => generated_name, :type_name => generated_name, :type_namespace => generated_namespace }
               process_complex_type(generated_namespace, inner_complex_type, generated_name)
             end
+          # we also have to recursively handle nested simple types!
+          elsif inner.xpath('./xs:simpleType', 'xs' => XSD).length > 0
+            inner.xpath('./xs:ximpleType', 'xs' => XSD).each do |inner_simple_type|
+              generated_namespace = "urn:__generated__"
+              @types[generated_namespace] ||= {}
+              generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
+              @types[namespace][name][element_name] = { :type => generated_name, :type_name => generated_name, :type_namespace => generated_namespace }
+              process_simple_type(generated_namespace, inner_complex_type, generated_name)
+            end
           end
+          
         end
 
         @types[namespace][name][:order!] ||= []
