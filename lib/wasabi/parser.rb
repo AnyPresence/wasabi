@@ -157,7 +157,7 @@ module Wasabi
                 operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
               elsif child_element.attribute('name') && child_element.xpath('xs:complexType', 'xs' => XSD).length > 0
                 name = child_element['name']
-                operation[:parameters][name] = { :name => name, :type => '__unknown__', :namespace_identifier => nil, :namespace => 'urn:__generated__', element: element }
+                operation[:parameters][name] = { :name => name, :type => '__unknown__', :namespace_identifier => nil, :namespace => 'urn:__generated__', element: child_element }
               elsif child_element.attribute('ref')
                 operation[:parameters][synthetic_ref_id(child_element)] = { :ref => child_element }
               end
