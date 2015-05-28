@@ -716,7 +716,7 @@ module Wasabi
                   # parts attribute, make sure that the name of the parts attribute matches the name of the part from above.  If not, then we simply
                   # want to return nil
                   document.xpath("wsdl:definitions/wsdl:binding[contains(@type, '#{port_type_name}')]/wsdl:operation[@name = '#{port_type_operation_name}']/wsdl:input", "wsdl" => WSDL).each do |binding_element|
-                    soap_body = binding_element.xpath('soap12:body', 'soap12' => SOAP_1_2).first || soap11_body = binding_element.xpath('soap11:body', 'soap11' => SOAP_1_1).first
+                    soap_body = binding_element.xpath('soap12:body', 'soap12' => SOAP_1_2).first || binding_element.xpath('soap11:body', 'soap11' => SOAP_1_1).first
                     if soap_body
                       parts = soap_body['parts']
                       if parts && !parts.split.include?(part_name)
