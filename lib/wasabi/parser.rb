@@ -155,7 +155,7 @@ module Wasabi
                 attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
                 
                 operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
-              elsif child_element.attribute('name') && child_element.xpath('xs:complexType').length > 0
+              elsif child_element.attribute('name') && child_element.xpath('xs:complexType', 'xs' => XSD).length > 0
                 name = child_element['name']
                 operation[:parameters][name] = { :name => name, :type => '__unknown__', :namespace_identifier => nil, :namespace => 'urn:__generated__', element: element }
               elsif child_element.attribute('ref')
@@ -185,7 +185,7 @@ module Wasabi
                       attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
 
                       operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
-                    elsif child_element.attribute('name') && child_element.xpath('xs:complexType').length > 0
+                    elsif child_element.attribute('name') && child_element.xpath('xs:complexType', 'xs' => XSD).length > 0
                       name = child_element['name']
                       operation[:parameters][name] = { :name => name, :type => '__unknown__', :namespace_identifier => nil, :namespace => 'urn:__generated__', element: child_element }
                     elsif child_element.attribute('ref')
