@@ -12,7 +12,7 @@ module Wasabi
     WSDL     = 'http://schemas.xmlsoap.org/wsdl/'
     SOAP_1_1 = 'http://schemas.xmlsoap.org/wsdl/soap/'
     SOAP_1_2 = 'http://schemas.xmlsoap.org/wsdl/soap12/'
-    
+
     STYLES = [:rpc_literal, :rpc_encoded, :document_literal]
 
     def initialize(document)
@@ -55,16 +55,16 @@ module Wasabi
 
     # Returns the elementFormDefault value.
     attr_accessor :element_form_default
-    
+
     # Returns the top-level elements defined in the XML schemas
     attr_accessor :top_level_elements
-    
+
     # Returns the style (either document or RPC)
     attr_accessor :style
-    
+
     # Returns any pseudo types that were created for RPC calls
     attr_accessor :pseudo_types
-    
+
     def parse
       parse_namespaces
       parse_endpoint
@@ -144,16 +144,16 @@ module Wasabi
     def parse_operations_parameters
       root_elements = document.xpath("wsdl:definitions/wsdl:types/*[local-name()='schema']/*[local-name()='element']", 'wsdl' => WSDL).each do |element|
         name = element.attribute('name').to_s.snakecase.to_sym
-        
+
         if operation = operation_for_input_element(element.attribute('name').to_s, target_namespace(element))
           if element.xpath("*[local-name() ='complexType']").length > 0
             element.xpath("*[local-name() ='complexType']/*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
               operation[:parameters] ||= {}
               if child_element.attribute('type')
                 attr_name = child_element.attribute('name').to_s
-                attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil              
+                attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil
                 attr_type = (attr_type = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_type[1] : attr_type[0]
-                
+
                 operation[:parameters][attr_name.to_sym] = { :name => attr_name, :type => attr_type, :namespace_identifier => attr_ns_id, :namespace => resolve_namespace(child_element, attr_ns_id) }
               elsif child_element.attribute('name') && child_element.xpath('xs:complexType', 'xs' => XSD).length > 0
                 name = child_element['name']
@@ -169,16 +169,16 @@ module Wasabi
               type_tokens = type.split ":"
               ns_prefix = type_tokens.length == 1 ? nil : type_tokens[0]
               local_type_name = type_tokens.last
-              
+
               namespace_key = ns_prefix.nil? ? "xmlns" : "xmlns:#{ns_prefix}"
               ns_value = element.namespaces[namespace_key]
-              
+
               document.xpath("wsdl:definitions/wsdl:types/*[local-name()='schema']/*[local-name()='complexType' and @name='#{local_type_name}']", { 'wsdl' => WSDL }).each do |element|
                 tns = target_namespace(element)
                 if tns == ns_value
                   element.xpath("*[local-name() ='sequence']/*[local-name() ='element']").each do |child_element|
                     operation[:parameters] ||= {}
-                    
+
                     if child_element.attribute('type')
                       attr_name = child_element.attribute('name').to_s
                       attr_ns_id = (attr_ns_id = child_element.attribute('type').to_s.split(':')).size > 1 ? attr_ns_id[0] : nil
@@ -259,10 +259,10 @@ module Wasabi
         end
       end
     end
-    
+
     def parse_rpc_top_level_elements
       return unless @style == 'rpc'
-      
+
       # Iterate over the operations and process each
       document.xpath('wsdl:definitions/wsdl:portType/wsdl:operation', 'wsdl' => WSDL).each do |operation|
         # In RPC style, the operation name is treated as a top level element
@@ -279,13 +279,13 @@ module Wasabi
           output_message_name = output['message']
           output_elt = output
         end
-        
+
         input_qname = expand_name(input_message_name, input_elt)
         output_qname = expand_name(output_message_name, output_elt)
-        
+
         input_element_name = operation_name
         output_element_name = output_message_name
-        
+
         @top_level_elements[input_qname[:namespace]] ||= {}
         input_type_hash = @top_level_elements[input_qname[:namespace]]
         input_type_hash[input_qname[:name]] = {}
@@ -293,12 +293,12 @@ module Wasabi
         # since this is a manufactured type, we don't want to conflict with user defined types,
         # so we'll prefix the type name with an ampersand, which would be illegal in XML, so there's no
         # chance of conflicting with an actual valid type
-        input_type[:type_name] = "&" + input_element_name + "Type" 
+        input_type[:type_name] = "&" + input_element_name + "Type"
         input_type[:type_namespace] = input_qname[:namespace]
         input_type[:type_namespace_identifier] = input_qname[:namespace_prefix]
-        
+
         create_rpc_pseudo_type(input_type, input_elt, operation_name.snakecase.to_sym, true)
-        
+
         @top_level_elements[output_qname[:namespace]] ||= {}
         output_type_hash = @top_level_elements[output_qname[:namespace]]
         output_type_hash[output_qname[:name]] = {}
@@ -307,11 +307,11 @@ module Wasabi
         output_type[:type_name] = "&" + output_qname[:name] + "Type"
         output_type[:type_namespace] = output_qname[:namespace]
         output_type[:type_namespace_identifier] = output_qname[:namespace_prefix]
-        
+
         create_rpc_pseudo_type(output_type, output_elt, operation_name.snakecase.to_sym, false)
       end
     end
-    
+
     def process_simple_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
@@ -345,7 +345,7 @@ module Wasabi
             local_type_name = referenced_element[:type_name]
             ns_pfx = referenced_element[:type_namespace_identifier]
             ns = referenced_element[:type_namespace]
-            
+
             new_params[ref_name] = { :name => element_name, :type => local_type_name, :namespace_identifier => ns_pfx, :namespace => ns }
           end
         end
@@ -354,7 +354,7 @@ module Wasabi
           operation[:parameters][new_param[:name]] = new_param
         end
       end
-      
+
       @types.each do |namespace, values|
         values.each do |name, element|
           next unless element[:refs]
@@ -368,7 +368,7 @@ module Wasabi
             new_elements[element_name] = { :type => local_type_name, :type_name => local_type_name, :type_namespace => ns }
             [synthetic_ref_id(ref), element_name]
           end
-          
+
           refs = ref_names.to_h
 
           [:order!, :unordered].each do |sym|
@@ -386,7 +386,7 @@ module Wasabi
           end
 
           element.delete :refs
-          
+
           new_elements.each do |element_name, value|
             @types[namespace][name][element_name] = value
           end
@@ -394,7 +394,7 @@ module Wasabi
         end
       end
     end
-    
+
     def resolve_unknown_parameter_types
       @operations.each do |operation_name, operation|
         next if !operation[:parameters]
@@ -404,18 +404,18 @@ module Wasabi
             target_generated_type = @generated_types[parameter[:element].to_s]
             parameter[:type] = target_generated_type[:type_name]
           end
-          
+
           parameter.delete(:element) if parameter.has_key?(:element)
         end
       end
-      
+
       @generated_types = nil
     end
 
     def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
-      
+
       type.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
         attribute_name = attribute.attribute('name').to_s
         attribute_type = attribute.attribute('type')
@@ -424,7 +424,7 @@ module Wasabi
         @types[namespace][name][:attributes!][attribute_name] = {}
         if attribute_type
           qname = expand_name(attribute_type.to_s, attribute)
-          
+
           @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
           @types[namespace][name][:attributes!][attribute_name][:type_name] = qname[:name]
           @types[namespace][name][:attributes!][attribute_name][:type_namespace] = qname[:namespace]
@@ -443,7 +443,7 @@ module Wasabi
       end
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
-        
+
         element_name = nil
         if inner.attribute('ref')
           element_name = synthetic_ref_id inner
@@ -455,7 +455,7 @@ module Wasabi
           if local_type_name
             ns = resolve_namespace(inner, ns_pfx)
             @types[namespace][name][element_name] = { :type => inner.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
-        
+
             [ :nillable, :minOccurs, :maxOccurs ].each do |attr|
               if v = inner.attribute(attr.to_s)
                 @types[namespace][name][element_name][attr] = v.to_s
@@ -482,13 +482,13 @@ module Wasabi
               process_simple_type(generated_namespace, inner_simple_type, generated_name)
             end
           end
-          
+
         end
 
         @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
       end
-      
+
       type.xpath('./xs:all/xs:element', 'xs' => XSD).each do |inner|
         element_name = nil
         if inner.attribute('ref')
@@ -508,11 +508,11 @@ module Wasabi
             end
           end
         end
-        
+
         @types[namespace][name][:unordered] ||= []
         @types[namespace][name][:unordered] << element_name
       end
-      
+
       type.xpath('./xs:complexContent/xs:extension/xs:sequence/xs:element', 'xs' => XSD).each do |inner_element|
         element_name = nil
         if inner_element.attribute('ref')
@@ -525,7 +525,7 @@ module Wasabi
           ns = resolve_namespace(inner_element, ns_pfx)
           @types[namespace][name][element_name] = { :type => inner_element.attribute('type').to_s, :type_name => local_type_name, :type_namespace => ns }
         end
-        
+
 
         @types[namespace][name][:order!] ||= []
         @types[namespace][name][:order!] << element_name
@@ -653,15 +653,15 @@ module Wasabi
 
       @sections = sections
     end
-    
+
     # returns all types merged with pseudo types
     def all_types
       all = {}
       @types.each { |k,v| all[k] = v }
-      
+
       @pseudo_types.each do |k,v|
         existing_types = all[k]
-        if existing_types.nil? 
+        if existing_types.nil?
           all[k] = v
         else
           all[k] = existing_types.merge(v)
@@ -669,12 +669,12 @@ module Wasabi
       end
       all
     end
-    
+
     private
-    
+
     def target_namespace(element)
       return nil if element.nil?
-      
+
       tns = element.attribute('targetNamespace')
       if tns.nil?
         return target_namespace(element.parent)
@@ -682,12 +682,12 @@ module Wasabi
         return tns.to_s
       end
     end
-    
+
     def resolve_namespace(element, prefix)
       ns_key = prefix.nil? ? "xmlns" : "xmlns:#{prefix}"
       element.namespaces[ns_key]
     end
-    
+
     def operation_for_input_element(element_name, element_namespace)
       document.xpath("wsdl:definitions/wsdl:message/wsdl:part[contains(@element,'#{element_name}')]", "wsdl" => WSDL).each do |element|
         part_name = element['name']
@@ -697,22 +697,22 @@ module Wasabi
           if v == element_namespace && element.attribute('element').to_s == fully_qualified_element_name
             message_element = element.parent
             message_name = message_element.attribute('name').to_s
-            
+
             message_namespace = target_namespace(message_element)
             document.xpath("wsdl:definitions/wsdl:portType/wsdl:operation/wsdl:input[contains(@message, '#{message_name}')]", "wsdl" => WSDL).each do |element|
               port_type_operation = element.parent
               port_type_operation_name = port_type_operation.attribute('name')
               port_type = port_type_operation.parent
               port_type_name = port_type.attribute('name')
-              
+
               element.namespaces.each do |k,v|
                 ns = k.split(":")[1]
                 fully_qualified_element_name = ns.nil? ? element_name : "#{ns}:#{message_name}"
                 if v == message_namespace && element.attribute('message').to_s == fully_qualified_element_name
                   operation_element = element.parent
                   operation_name = operation_element.attribute('name').to_s
-                  
-                  # check the binding -- if there's a binding, and there's an input defined for the operation, and the body for the input defines a 
+
+                  # check the binding -- if there's a binding, and there's an input defined for the operation, and the body for the input defines a
                   # parts attribute, make sure that the name of the parts attribute matches the name of the part from above.  If not, then we simply
                   # want to return nil
                   document.xpath("wsdl:definitions/wsdl:binding[contains(@type, '#{port_type_name}')]/wsdl:operation[@name = '#{port_type_operation_name}']/wsdl:input", "wsdl" => WSDL).each do |binding_element|
@@ -724,35 +724,35 @@ module Wasabi
                       end
                     end
                   end
-                  
+
                   return @operations[operation_name.snakecase.to_sym]
                 end
               end
             end
-            
+
           end
         end
       end
-      
+
       nil
     end
-    
+
     def resolve_element_ref(element)
       ref_qname = expand_name(element.attribute('ref').to_s, element)
-      
+
       namespace = ref_qname[:namespace]
       name = ref_qname[:name]
-      
+
       ref_element = @top_level_elements[namespace][name]
       ref_element[:name] = name
       ref_element
     end
-    
+
     def expand_name(name, elt)
       qname = {}
-      
+
       segments = name.split(":")
-      
+
       if segments.length == 1
         qname[:namespace_prefix] = nil
         qname[:name] = segments[0]
@@ -760,46 +760,46 @@ module Wasabi
         qname[:namespace_prefix] = segments.first
         qname[:name] = segments.last
       end
-      
+
       qname[:namespace] = resolve_namespace(elt, qname[:namespace_prefix])
       qname
     end
-    
+
     def synthetic_ref_id(element)
       "REF!" + element.attribute('ref').to_s
     end
-    
+
     def parse_synthetic_ref_id(synthetic_ref_id)
       synthetic_ref_id.gsub /REF\!/, ''
     end
-    
+
     def create_rpc_pseudo_type(type, elt, operation_identifier, input)
       operation = @operations[operation_identifier]
-      
+
       message = elt['message']
       message_qname = expand_name(message, elt)
-      
-      message_declarations = document.xpath('wsdl:definitions/wsdl:message', 'wsdl' => WSDL).select do |message| 
+
+      message_declarations = document.xpath('wsdl:definitions/wsdl:message', 'wsdl' => WSDL).select do |message|
         segments = message['name'].split(':').reverse
         message_localname = segments[0]
         message_qname[:name] == message_localname
       end
-      
+
       message_declaration = message_declarations.last
-      
+
       @pseudo_types[type[:type_namespace]] ||= {}
       @pseudo_types[type[:type_namespace]][type[:type_name]] = {}
-      
+
       pseudo_type = @pseudo_types[type[:type_namespace]][type[:type_name]]
-      
+
       message_declaration.xpath('./wsdl:part', 'wsdl' => WSDL).each do |part|
         raise "Referencing an element not yet supported from a part declared in a message" if part['type'].nil? && !part['element'].nil?
-        
+
         part_name = part['name']
         part_type = part['type']
-        
+
         part_qname = expand_name(part_type, part)
-        
+
         pseudo_type[:namespace] = type[:type_namespace]
         pseudo_type[:"order!"] ||= []
         pseudo_type[:"order!"] << part_name
@@ -807,7 +807,7 @@ module Wasabi
         pseudo_type[part_name][:type] = part_type
         pseudo_type[part_name][:type_name] = part_qname[:name]
         pseudo_type[part_name][:type_namespace] = part_qname[:namespace]
-        
+
         if input
           operation[:parameters] ||= {}
           operation[:parameters][part_name.to_sym] ||= {}
