@@ -27,6 +27,7 @@ module Wasabi
       self.style = nil
       self.pseudo_types = {}
       @generated_types = {}
+      @attribute_groups = {}
     end
 
     # Returns the Nokogiri document.
@@ -75,6 +76,7 @@ module Wasabi
       parse_style
       parse_operations
       parse_operations_parameters
+      parse_attribute_groups
       parse_types
       parse_deferred_types
       parse_rpc_top_level_elements
@@ -227,6 +229,28 @@ module Wasabi
       end
     end
 
+    def parse_attribute_groups
+      document.xpath('wsdl:definitions/wsdl:types/xs:schema/xs:attributeGroup', {'wsdl' => WSDL, 'xs' => XSD}).each do |attribute_group|
+        qname = expand_name(attribute_group['name'], attribute_group)
+
+        @attribute_groups[qname[:namespace]] ||= {}
+        @attribute_groups[qname[:namespace]][qname[:name]] = []
+
+        attribute_group.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
+          name = attribute['name']
+          type = expand_name(attribute['type'], attribute)
+
+          new_attr = {}
+          new_attr[:type] = type[:name]
+          new_attr[:type_name] = type[:name]
+          new_attr[:type_namespace] = type[:namespace]
+          new_attr[:name] = name
+
+          @attribute_groups[qname[:namespace]][qname[:name]] << new_attr
+        end
+      end
+    end
+
     def parse_types
       schemas.each do |schema|
         schema_namespace = schema['targetNamespace']
@@ -331,6 +355,37 @@ module Wasabi
           @types[namespace][name][:base_type][:pattern] = value
         end
       end
+
+      type.xpath('./xs:extension', 'xs' => XSD).each do |extension|
+        base_name = extension['base']
+        qname = expand_name base_name, extension
+        localname = qname[:name]
+        ns = qname[:namespace]
+        puts "QNAME #{@types[namespace]}"
+
+        @types[namespace][name][:base_type] = { :type => base_name, :type_name => localname, :type_namespace => ns }
+        @types[namespace][name][:attributes!] ||= {}
+
+        extension.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
+          process_attribute(namespace, type, name, attribute)
+        end
+=begin
+          attribute_name = attribute['name']
+          attribute_type = attribute['type']
+
+          @types[namespace][name][:attributes!][attribute_name] = {}
+
+          if attribute_type
+            puts "Expanding for #{attribute_type} and #{attribute.to_s}"
+            attribute_type_qname = expand_name attribute_type, attribute
+            @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
+            @types[namespace][name][:attributes!][attribute_name][:type_name] = attribute_type_qname[:name]
+            @types[namespace][name][:attributes!][attribute_name][:type_namespace] = attribute_type_qname[:namespace]
+          else
+            # Stuff
+          end
+=end
+      end
     end
 
     def resolve_element_refs
@@ -412,34 +467,56 @@ module Wasabi
       @generated_types = nil
     end
 
+    def process_attribute(namespace, type, name, attribute)
+      attribute_name = attribute.attribute('name').to_s
+      attribute_type = attribute.attribute('type')
+
+      @types[namespace][name][:attributes!] ||= {}
+      @types[namespace][name][:attributes!][attribute_name] = {}
+      if attribute_type
+        qname = expand_name(attribute_type.to_s, attribute)
+
+        @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
+        @types[namespace][name][:attributes!][attribute_name][:type_name] = qname[:name]
+        @types[namespace][name][:attributes!][attribute_name][:type_namespace] = qname[:namespace]
+      elsif attribute.xpath('./xs:simpleType', 'xs' => XSD).length > 0
+        attribute.xpath('./xs:simpleType', 'xs' => XSD).each do |simple_type|
+          generated_namespace = "urn:__generated__"
+          @types[generated_namespace] ||= {}
+          generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
+          @types[namespace][name][:attributes!][attribute_name][:type] = generated_name
+          @types[namespace][name][:attributes!][attribute_name][:type_name]  = generated_name
+          @types[namespace][name][:attributes!][attribute_name][:type_namespace]  = generated_namespace
+          @generated_types[type.to_s] = @types[namespace][name][:attributes!][attribute_name]
+          process_simple_type(generated_namespace, simple_type, generated_name)
+        end
+      end
+    end
+
     def process_complex_type(namespace, type, name)
       @types[namespace] ||= {}
       @types[namespace][name] ||= { :namespace => namespace }
 
+      type.xpath('./xs:simpleContent', 'xs' => XSD).each do |simple_content|
+        process_simple_type(namespace, simple_content, name)
+      end
+
       type.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
-        attribute_name = attribute.attribute('name').to_s
-        attribute_type = attribute.attribute('type')
+        process_attribute(namespace, type, name, attribute)
+      end
 
-        @types[namespace][name][:attributes!] ||= {}
-        @types[namespace][name][:attributes!][attribute_name] = {}
-        if attribute_type
-          qname = expand_name(attribute_type.to_s, attribute)
+      type.xpath('./xs:attributeGroup', 'xs' => XSD).each do |attribute_group|
+        ref = expand_name(attribute_group['ref'], attribute_group)
+        attribute_group_def = @attribute_groups[ref[:namespace]][ref[:name]].each do |attribute_def|
+          attribute_name = attribute_def[:name]
 
+          @types[namespace][name][:attributes!] ||= {}
+          @types[namespace][name][:attributes!][attribute_name] ||= {}
           @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
-          @types[namespace][name][:attributes!][attribute_name][:type_name] = qname[:name]
-          @types[namespace][name][:attributes!][attribute_name][:type_namespace] = qname[:namespace]
-        elsif attribute.xpath('./xs:simpleType', 'xs' => XSD).length > 0
-          attribute.xpath('./xs:simpleType', 'xs' => XSD).each do |simple_type|
-            generated_namespace = "urn:__generated__"
-            @types[generated_namespace] ||= {}
-            generated_name = "__generated__" + (@types[generated_namespace].length + 1).to_s
-            @types[namespace][name][:attributes!][attribute_name][:type] = generated_name
-            @types[namespace][name][:attributes!][attribute_name][:type_name]  = generated_name
-            @types[namespace][name][:attributes!][attribute_name][:type_namespace]  = generated_namespace
-            @generated_types[type.to_s] = @types[namespace][name][:attributes!][attribute_name]
-            process_simple_type(generated_namespace, simple_type, generated_name)
-          end
+          @types[namespace][name][:attributes!][attribute_name][:type_name] = attribute_def[:type_name]
+          @types[namespace][name][:attributes!][attribute_name][:type_namespace] = attribute_def[:type_namespace]
         end
+        puts "Found attribute group #{attribute_group_def.to_s}"
       end
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
