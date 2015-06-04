@@ -361,7 +361,6 @@ module Wasabi
         qname = expand_name base_name, extension
         localname = qname[:name]
         ns = qname[:namespace]
-        puts "QNAME #{@types[namespace]}"
 
         @types[namespace][name][:base_type] = { :type => base_name, :type_name => localname, :type_namespace => ns }
         @types[namespace][name][:attributes!] ||= {}
@@ -369,22 +368,6 @@ module Wasabi
         extension.xpath('./xs:attribute', 'xs' => XSD).each do |attribute|
           process_attribute(namespace, type, name, attribute)
         end
-=begin
-          attribute_name = attribute['name']
-          attribute_type = attribute['type']
-
-          @types[namespace][name][:attributes!][attribute_name] = {}
-
-          if attribute_type
-            puts "Expanding for #{attribute_type} and #{attribute.to_s}"
-            attribute_type_qname = expand_name attribute_type, attribute
-            @types[namespace][name][:attributes!][attribute_name][:type] = attribute_name
-            @types[namespace][name][:attributes!][attribute_name][:type_name] = attribute_type_qname[:name]
-            @types[namespace][name][:attributes!][attribute_name][:type_namespace] = attribute_type_qname[:namespace]
-          else
-            # Stuff
-          end
-=end
       end
     end
 
@@ -516,7 +499,6 @@ module Wasabi
           @types[namespace][name][:attributes!][attribute_name][:type_name] = attribute_def[:type_name]
           @types[namespace][name][:attributes!][attribute_name][:type_namespace] = attribute_def[:type_namespace]
         end
-        puts "Found attribute group #{attribute_group_def.to_s}"
       end
 
       type.xpath('./xs:sequence/xs:element', 'xs' => XSD).each do |inner|
