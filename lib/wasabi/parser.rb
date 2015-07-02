@@ -256,7 +256,7 @@ module Wasabi
         schema_namespace = schema['targetNamespace']
 
         schema.element_children.each do |node|
-          namespace = schema_namespace || @namespace
+          namespace = schema_namespace
           @top_level_elements[namespace] ||= {}
 
           case node.name
